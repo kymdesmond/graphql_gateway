@@ -58,6 +58,7 @@ public class SwaggerGraphQLSchemaBuilder {
             dataFetchers.put(FieldCoordinates.coordinates("Query", queryField.getName()), buildDataFetcher(host, basePath, key, value));
         });
 
+        // TODO Add mutation
         schemaBuilder
                 .queryFields(queryFields)
                 .objectTypes(objectTypes)
@@ -93,6 +94,7 @@ public class SwaggerGraphQLSchemaBuilder {
 
     /**
      * Maps Swagger path with GraphQLFieldDefinition
+     * Get requests
      * @param swaggerPath
      * @return
      */
@@ -156,18 +158,15 @@ public class SwaggerGraphQLSchemaBuilder {
                 .map(Parameter::getName)
                 .collect(Collectors.toList());
 
-        return new DataFetcher() {
-            @Override
-            public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
-                String urlParams = pathParams
-                        .stream()
-                        .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
-                Request request = new Request.Builder().url(urlParams).build();
-                Response response = client.newCall(request).execute();
-                final String json = response.body().string();
+        return dataFetchingEnvironment -> {
+            String urlParams = pathParams
+                    .stream()
+                    .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
+            Request request = new Request.Builder().url(urlParams).build();
+            Response response = client.newCall(request).execute();
+            final String json = response.body().string();
 
-                return objectMapper.readValue(json, new TypeReference<>(){});
-            }
+            return objectMapper.readValue(json, new TypeReference<>(){});
         };
     }
 

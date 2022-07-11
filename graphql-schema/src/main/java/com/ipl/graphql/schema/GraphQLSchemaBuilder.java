@@ -2,8 +2,7 @@ package com.ipl.graphql.schema;
 
 import graphql.schema.*;
 import lombok.NonNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -13,12 +12,10 @@ import static graphql.schema.GraphQLCodeRegistry.newCodeRegistry;
 import static graphql.schema.GraphQLObjectType.newObject;
 import static graphql.schema.GraphQLSchema.newSchema;
 
+@Slf4j
 public class GraphQLSchemaBuilder {
     private static final String QUERY = "Query";
     private static final String MUTATION = "Mutation";
-
-    /** Logger. */
-    private static final Logger LOG = LoggerFactory.getLogger(GraphQLSchemaBuilder.class);
 
     /** Object types. */
     private Map<String, GraphQLObjectType> objectTypesMap = new HashMap<>();
@@ -37,7 +34,7 @@ public class GraphQLSchemaBuilder {
         if (!this.objectTypesMap.containsKey(objectType.getName())) {
             this.objectTypesMap.put(objectType.getName(), objectType);
         } else {
-            LOG.warn("The object type '{}' has already been defined, its definition will be ignored", objectType.getName());
+            log.warn("The object type '{}' has already been defined, its definition will be ignored", objectType.getName());
         }
 
         return this;
@@ -53,7 +50,7 @@ public class GraphQLSchemaBuilder {
         if (!this.interfaceTypesMap.containsKey(interfaceType.getName())) {
             this.interfaceTypesMap.put(interfaceType.getName(), interfaceType);
         } else {
-            LOG.warn("The interface type '{}' has already been defined, its definition will be ignored",
+            log.warn("The interface type '{}' has already been defined, its definition will be ignored",
                     interfaceType.getName());
         }
 
@@ -70,7 +67,7 @@ public class GraphQLSchemaBuilder {
         if (!this.queryFieldsMap.containsKey(fieldDefinition.getName())) {
             this.queryFieldsMap.put(fieldDefinition.getName(), fieldDefinition);
         } else {
-            LOG.warn("The query field '{}' has already been defined, its definition will be ignored", fieldDefinition.getName());
+            log.warn("The query field '{}' has already been defined, its definition will be ignored", fieldDefinition.getName());
         }
 
         return this;
@@ -86,7 +83,7 @@ public class GraphQLSchemaBuilder {
         if (!this.mutationFieldsMap.containsKey(fieldDefinition.getName())) {
             this.mutationFieldsMap.put(fieldDefinition.getName(), fieldDefinition);
         } else {
-            LOG.warn("The mutation field '{}' has already been defined, its definition will be ignored", fieldDefinition.getName());
+            log.warn("The mutation field '{}' has already been defined, its definition will be ignored", fieldDefinition.getName());
         }
 
         return this;
@@ -102,7 +99,7 @@ public class GraphQLSchemaBuilder {
         if (!this.dataFetchersMap.containsKey(coordinates)) {
             this.dataFetchersMap.put(coordinates, dataFetcher);
         } else {
-            LOG.warn("The data fetcher for '{}' has already been defined, its definition will be ignored", coordinates);
+            log.warn("The data fetcher for '{}' has already been defined, its definition will be ignored", coordinates);
         }
 
         return this;
@@ -120,7 +117,7 @@ public class GraphQLSchemaBuilder {
         if (!this.typeResolversMap.containsKey(typeName)) {
             this.typeResolversMap.put(typeName, typeResolver);
         } else {
-            LOG.warn("The type resolver for '{}' has already been defined, its definition will be ignored",
+            log.warn("The type resolver for '{}' has already been defined, its definition will be ignored",
                     typeName);
         }
 
