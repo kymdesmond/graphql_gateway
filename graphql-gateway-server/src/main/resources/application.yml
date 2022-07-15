@@ -5,3 +5,5 @@ management:
     web:
       exposure:
         include: "*"
+schema: openapi
+#schema: swagger
