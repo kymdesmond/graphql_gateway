@@ -11,7 +11,9 @@ import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.parameters.PathParameter;
+import io.swagger.v3.oas.models.responses.ApiResponses;
 import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -24,15 +26,22 @@ import static graphql.schema.GraphQLArgument.newArgument;
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 import static graphql.schema.GraphQLObjectType.newObject;
 
+@Slf4j
 public class OpenApiGraphQLSchemaBuilder {
     
     private final GraphQLSchemaBuilder schemaBuilder;
+
+    private final Map<String, GraphQLScalarType> scalarTypes = new HashMap<>() {
+        {put("string", GraphQLString);}
+        {put("integer", GraphQLInt);}
+    };
 
     public OpenApiGraphQLSchemaBuilder() {
         this.schemaBuilder = new GraphQLSchemaBuilder();
     }
  
     public OpenApiGraphQLSchemaBuilder openapi(OpenAPI openAPI) {
+        log.info("--Building GraphQL schema from OpenAPI--");
         // type definitions
         List<GraphQLObjectType> objectTypes = openAPI.getComponents().getSchemas()
                 .entrySet()
@@ -40,6 +49,7 @@ public class OpenApiGraphQLSchemaBuilder {
                 .map(schemaEntry -> toGraphQLObjectType(schemaEntry.getKey(), schemaEntry.getValue()))
                 .collect(Collectors.toList());
 
+        log.info("Object types: {}", objectTypes);
         // query type
         List<GraphQLFieldDefinition> queryFields = new ArrayList<>();
 
@@ -53,13 +63,14 @@ public class OpenApiGraphQLSchemaBuilder {
         // subscription type
         List<GraphQLFieldDefinition> subscriptionFields = new ArrayList<>();
 
-        String host = "http://" + openAPI.getServers().get(0).getUrl();
+        String host = openAPI.getServers().get(0).getUrl();
         openAPI.getPaths().forEach((key, value) -> {
             Map<PathItem.HttpMethod, Operation> operationsMap = value.readOperationsMap();
             operationsMap.entrySet().stream()
                     .map(entry -> {
                         switch (entry.getKey()) {
                             case GET:
+                                log.info("GET: {}", entry.getValue());
                                 final GraphQLFieldDefinition queryField = pathToGraphQLField(key, value);
                                 queryFields.add(queryField);
                                 dataFetchers.put(FieldCoordinates.coordinates("Query", queryField.getName()), buildDataFetcher(host, key, value));
@@ -87,6 +98,10 @@ public class OpenApiGraphQLSchemaBuilder {
         return this;
     }
 
+    public GraphQLSchema build() {
+        return schemaBuilder.build();
+    }
+
     /**
      * Maps Swagger path with GraphQLFieldDefinition
      * Get requests
@@ -94,6 +109,7 @@ public class OpenApiGraphQLSchemaBuilder {
      * @return
      */
     private GraphQLFieldDefinition pathToGraphQLField(String name, PathItem pathItem) {
+        log.info("Path to GraphQLFieldDefinition: {} -- {}", name, pathItem.toString());
         GraphQLFieldDefinition.Builder builder = newFieldDefinition()
                 .name(pathToType(name))
                 .type(mapOutputType("",
@@ -107,6 +123,7 @@ public class OpenApiGraphQLSchemaBuilder {
                     .collect(Collectors.toList())
             );
         }
+        log.info("builder -- {}", builder.toString());
 
         return builder.build();
     }
@@ -137,10 +154,6 @@ public class OpenApiGraphQLSchemaBuilder {
         } else if (parameter instanceof RequestBody) {
             swaggerType = parameter.getSchema().getType();
         }
-        final Map<String, GraphQLScalarType> scalarTypes = new HashMap<>() {
-            {put("string", GraphQLString);}
-            {put("integer", GraphQLInt);}
-        };
         if (isID(fieldName)) {
             return GraphQLID;
         } else {
@@ -179,19 +192,18 @@ public class OpenApiGraphQLSchemaBuilder {
     private Optional<GraphQLOutputType> mapOutputType(String name, Schema schema) {
         GraphQLOutputType outputType = null;
 
-        final Map<String, GraphQLScalarType> scalarTypes = new HashMap<>() {
-            {put("string", GraphQLString);}
-            {put("integer", GraphQLInt);}
-        };
-
         if (isID(name)) {
+            log.info("{} is ID", name);
             outputType = GraphQLID;
         } else if (scalarTypes.containsKey(schema.getType())) {
             outputType = scalarTypes.get(schema.getType());
+            log.info("{} is scalar type: {}", name, outputType);
         } else if (isReference(schema)) {
             outputType = GraphQLTypeReference.typeRef(schema.get$ref().replace("#/components/schemas/", ""));
+            log.info("{} is reference type: {}", name, outputType);
         } else if (isArray(schema)) {
-            outputType = GraphQLList.list(mapOutputType(name, schema).orElse(null));
+            outputType = GraphQLList.list(mapOutputType(name, ((ArraySchema)schema).getItems()).orElse(null));
+            log.info("{} is array type {}", name, outputType);
         }
         return Optional.ofNullable(outputType);
     }
@@ -203,7 +215,9 @@ public class OpenApiGraphQLSchemaBuilder {
     private DataFetcher buildDataFetcher(String host, String path, PathItem swaggerPath) {
         final OkHttpClient client = new OkHttpClient();
         final ObjectMapper objectMapper = new ObjectMapper();
-        final String url = host +  path;
+        final String url = host + path;
+        log.info("fetch data from host -- {}", host);
+        log.info("fetch data from url -- {}", url);
         List<String> pathParams = Optional.ofNullable(swaggerPath.getGet().getParameters()).orElse(Collections.emptyList())
                 .stream()
                 .map(Parameter::getName)
@@ -228,7 +242,7 @@ public class OpenApiGraphQLSchemaBuilder {
      * @return
      */
     private boolean isReference(Schema swaggerSchema) {
-        return swaggerSchema.get$ref().contains("#/components/schemas/");
+        return swaggerSchema.get$ref() != null && swaggerSchema.get$ref().contains("#/components/schemas/");
     }
 
     /**
@@ -251,8 +265,11 @@ public class OpenApiGraphQLSchemaBuilder {
     }
 
     private String pathToType(String path) {
-        return Arrays.stream(path.split("/"))
+        log.info("Path to type: path -- {}", path);
+        String type = Arrays.stream(path.split("/"))
                 .reduce("", (acc, curr) -> (acc.isBlank())?curr: acc + buildPathName(curr));
+        log.info("Path to type: type -- {}", type);
+        return type.replaceAll("-", ""); //todo convert to camel case
     }
 
     private String buildPathName(String name) {
