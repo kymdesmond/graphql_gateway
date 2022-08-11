@@ -13,6 +13,7 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.parameters.PathParameter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -84,13 +85,13 @@ public class OpenApiGraphQLSchemaBuilder {
                                 log.info("GET: {}", entry.getValue());
                                 final GraphQLFieldDefinition queryField = pathToGraphQLField(entry.getValue().getOperationId(), value);
                                 queryFields.add(queryField);
-                                dataFetchers.put(FieldCoordinates.coordinates("Query", queryField.getName()), buildDataFetcher(host, key, value.getGet()));
+                                dataFetchers.put(FieldCoordinates.coordinates("Query", queryField.getName()), buildDataFetcher(host, key, value.getGet(), "GET"));
                                 return entry.getValue();
                             case POST:
                                 log.info("POST: {}", entry.getValue());
                                  final GraphQLFieldDefinition mutationField = pathToPostGraphQLField(entry.getValue().getOperationId(), value);
                                  mutationFields.add(mutationField);
-                                 dataFetchers.put(FieldCoordinates.coordinates("Mutation", mutationField.getName()), buildDataFetcher(host, key, value.getPost()));
+                                 dataFetchers.put(FieldCoordinates.coordinates("Mutation", mutationField.getName()), buildDataFetcher(host, key, value.getPost(), "POST"));
                                  return entry.getValue();
                             case PUT:
                                 log.info("PUT: {}", entry.getValue());
@@ -303,7 +304,7 @@ public class OpenApiGraphQLSchemaBuilder {
      * Builds DataFetcher for a given query field
      * @return
      */
-    private DataFetcher buildDataFetcher(String host, String path, Operation operation) {
+    private DataFetcher buildDataFetcher(String host, String path, Operation operation, String operationName) {
         final OkHttpClient client = new OkHttpClient();
         final ObjectMapper objectMapper = new ObjectMapper();
         final String url = host + path;
@@ -314,16 +315,31 @@ public class OpenApiGraphQLSchemaBuilder {
                 .map(Parameter::getName)
                 .collect(Collectors.toList());
 
-        return dataFetchingEnvironment -> {
-            String urlParams = pathParams
-                    .stream()
-                    .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
-            Request request = new Request.Builder().url(urlParams).build();
-            Response response = client.newCall(request).execute();
-            final String json = response.body().string();
+        if (operationName.equalsIgnoreCase("GET")) {
+            return dataFetchingEnvironment -> {
+                String urlParams = pathParams
+                        .stream()
+                        .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
+                Request request = new Request.Builder().url(urlParams).build();
+                Response response = client.newCall(request).execute();
+                final String json = response.body().string();
 
-            return objectMapper.readValue(json, new TypeReference<>(){});
-        };
+                return objectMapper.readValue(json, new TypeReference<>(){});
+            };
+        } else {
+            return dataFetchingEnvironment -> {
+                String urlParams = pathParams
+                        .stream()
+                        .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
+                Request request = new Request.Builder()
+                        .url(urlParams)
+                        .post(okhttp3.RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"), objectMapper.writeValueAsString(dataFetchingEnvironment.getArgument("input"))))
+                        .build();
+                Response response = client.newCall(request).execute();
+                final String json = response.body().string();
+                return objectMapper.readValue(json, new TypeReference<>(){});
+            };
+        }
     }
 
 
