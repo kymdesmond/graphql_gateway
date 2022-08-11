@@ -85,24 +85,20 @@ public class OpenApiGraphQLSchemaBuilder {
                                 log.info("GET: {}", entry.getValue());
                                 final GraphQLFieldDefinition queryField = pathToGraphQLField(entry.getValue().getOperationId(), value);
                                 queryFields.add(queryField);
-                                dataFetchers.put(FieldCoordinates.coordinates("Query", queryField.getName()), buildDataFetcher(host, key, value.getGet(), "GET"));
+                                dataFetchers.put(FieldCoordinates.coordinates("Query", queryField.getName()), buildDataFetcher(host, key, value.getGet(), entry.getKey()));
                                 return entry.getValue();
                             case POST:
-                                log.info("POST: {}", entry.getValue());
-                                 final GraphQLFieldDefinition mutationField = pathToPostGraphQLField(entry.getValue().getOperationId(), value);
-                                 mutationFields.add(mutationField);
-                                 dataFetchers.put(FieldCoordinates.coordinates("Mutation", mutationField.getName()), buildDataFetcher(host, key, value.getPost(), "POST"));
+                                log.info("{}: {}", entry.getKey(), entry.getValue());
+                                 final GraphQLFieldDefinition postMutationField = pathToPostGraphQLField(entry.getValue().getOperationId(), value);
+                                 mutationFields.add(postMutationField);
+                                 dataFetchers.put(FieldCoordinates.coordinates("Mutation", postMutationField.getName()), buildDataFetcher(host, key, value.getPost(), entry.getKey()));
                                  return entry.getValue();
                             case PUT:
-                                log.info("PUT: {}", entry.getValue());
-                                return entry.getValue();
-                            case DELETE:
-                                log.info("DELETE: {}", entry.getValue());
-                                return entry.getValue();
-                            case PATCH:
-                                log.info("PATCH: {}", entry.getValue());
-                                return entry.getValue();
-
+                                 log.info("{}: {}", entry.getKey(), entry.getValue());
+                                 final GraphQLFieldDefinition putMutationField = pathToPutGraphQLField(entry.getValue().getOperationId(), value);
+                                 mutationFields.add(putMutationField);
+                                 dataFetchers.put(FieldCoordinates.coordinates("Mutation", putMutationField.getName()), buildDataFetcher(host, key, value.getPut(), entry.getKey()));
+                                 return entry.getValue();
                             default:
                                 return null;
                         }
@@ -170,6 +166,36 @@ public class OpenApiGraphQLSchemaBuilder {
                         pathItem.getPost().getResponses().get("200").getContent().get("application/json").getSchema())
                         .orElse(null)); // GraphQLString
 
+        return builder.build();
+    }
+
+    /**
+     * Maps Swagger path with GraphQLFieldDefinition
+     * Put requests
+     * @param pathItem
+     * @return
+     */
+    private GraphQLFieldDefinition pathToPutGraphQLField(String name, PathItem pathItem) {
+        log.info("Path to GraphQLFieldDefinition: {} -- {}", name, pathItem.toString());
+        GraphQLArgument argument = newArgument()
+                .name("input")
+                .type(mapInputType("",
+                        pathItem.getPut().getRequestBody().getContent().get("application/json").getSchema())
+                        .orElse(null)).build();
+        GraphQLFieldDefinition.Builder builder = newFieldDefinition()
+                .name(name)
+                .argument(argument)
+                .type(mapOutputType("",
+                        pathItem.getPut().getResponses().get("200").getContent().get("application/json").getSchema())
+                        .orElse(null)); // GraphQLString
+
+        if (pathItem.getPut().getParameters() != null) {
+            builder.arguments(pathItem.getPut().getParameters()
+                    .stream()
+                    .map(parameter -> parameterToGraphQLArgument(parameter))
+                    .collect(Collectors.toList())
+            );
+        }
         return builder.build();
     }
 
@@ -304,7 +330,7 @@ public class OpenApiGraphQLSchemaBuilder {
      * Builds DataFetcher for a given query field
      * @return
      */
-    private DataFetcher buildDataFetcher(String host, String path, Operation operation, String operationName) {
+    private DataFetcher buildDataFetcher(String host, String path, Operation operation, PathItem.HttpMethod httpMethod) {
         final OkHttpClient client = new OkHttpClient();
         final ObjectMapper objectMapper = new ObjectMapper();
         final String url = host + path;
@@ -315,31 +341,43 @@ public class OpenApiGraphQLSchemaBuilder {
                 .map(Parameter::getName)
                 .collect(Collectors.toList());
 
-        if (operationName.equalsIgnoreCase("GET")) {
-            return dataFetchingEnvironment -> {
-                String urlParams = pathParams
-                        .stream()
-                        .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
-                Request request = new Request.Builder().url(urlParams).build();
-                Response response = client.newCall(request).execute();
-                final String json = response.body().string();
+        return dataFetchingEnvironment -> {
+            String urlParams = pathParams
+                    .stream()
+                    .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
+            okhttp3.RequestBody requestBody = okhttp3.RequestBody
+                    .create(MediaType.parse("application/json; charset=utf-8"), objectMapper.writeValueAsString(dataFetchingEnvironment.getArgument("input")));
+            Request request;
+            switch (httpMethod) {
+                case POST:
+                    request = new Request.Builder()
+                            .url(urlParams)
+                            .post(requestBody)
+                            .build();
+                    break;
+                case PUT:
+                    request = new Request.Builder()
+                            .url(urlParams)
+                            .put(requestBody)
+                            .build();
+                    break;
+                case DELETE:
+                    request = new Request.Builder()
+                            .url(urlParams)
+                            .delete()
+                            .build();
+                    break;
+                default:
+                    request = new Request.Builder()
+                            .url(urlParams)
+                            .build();
+                    break;
+            }
+            Response response = client.newCall(request).execute();
+            final String json = response.body().string();
+            return objectMapper.readValue(json, new TypeReference<>(){});
+        };
 
-                return objectMapper.readValue(json, new TypeReference<>(){});
-            };
-        } else {
-            return dataFetchingEnvironment -> {
-                String urlParams = pathParams
-                        .stream()
-                        .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
-                Request request = new Request.Builder()
-                        .url(urlParams)
-                        .post(okhttp3.RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"), objectMapper.writeValueAsString(dataFetchingEnvironment.getArgument("input"))))
-                        .build();
-                Response response = client.newCall(request).execute();
-                final String json = response.body().string();
-                return objectMapper.readValue(json, new TypeReference<>(){});
-            };
-        }
     }
 
 
