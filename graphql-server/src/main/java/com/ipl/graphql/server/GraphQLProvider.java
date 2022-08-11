@@ -83,7 +83,7 @@ public class GraphQLProvider {
             case "openapi":
                 OpenApiGraphQLSchemaBuilder openapiGraphQLConverter = new OpenApiGraphQLSchemaBuilder();
                 openApiServices.values().stream().forEach(openapiGraphQLConverter::openapi);
-                GraphQL.newGraphQL(openapiGraphQLConverter.build()).build();
+                this.graphQL = GraphQL.newGraphQL(openapiGraphQLConverter.build()).build();
                 break;
             case "swagger":
                 SwaggerGraphQLSchemaBuilder swaggerGraphQLConverter = new SwaggerGraphQLSchemaBuilder();

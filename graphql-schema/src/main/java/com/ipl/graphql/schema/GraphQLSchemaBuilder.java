@@ -19,6 +19,10 @@ public class GraphQLSchemaBuilder {
 
     /** Object types. */
     private Map<String, GraphQLObjectType> objectTypesMap = new HashMap<>();
+
+    /** Input types. */
+    private Map<String, GraphQLInputObjectType> inputObjectTypeMap = new HashMap<>();
+
     /** Interface types. */
     private Map<String, GraphQLInterfaceType> interfaceTypesMap = new HashMap<>();
     /** Query fields. */
@@ -40,8 +44,24 @@ public class GraphQLSchemaBuilder {
         return this;
     }
 
+    public GraphQLSchemaBuilder inputObjectType(@NonNull GraphQLInputObjectType inputObjectType) {
+        if (!this.inputObjectTypeMap.containsKey(inputObjectType.getName())) {
+            this.inputObjectTypeMap.put(inputObjectType.getName(), inputObjectType);
+        } else {
+            log.warn("The input object type '{}' has already been defined, its definition will be ignored", inputObjectType.getName());
+        }
+
+        return this;
+    }
+
     public GraphQLSchemaBuilder objectTypes(@NonNull Collection<GraphQLObjectType> objectTypes) {
         objectTypes.stream().forEach(this::objectType);
+
+        return this;
+    }
+
+    public GraphQLSchemaBuilder inputObjectTypes(@NonNull Collection<GraphQLInputObjectType> inputObjectTypes) {
+        inputObjectTypes.stream().forEach(this::inputObjectType);
 
         return this;
     }
@@ -141,13 +161,16 @@ public class GraphQLSchemaBuilder {
         // Object types
         this.objectTypesMap.values().stream().forEach(schemaBuilder::additionalType);
 
+        // Input types
+        this.inputObjectTypeMap.values().stream().forEach(schemaBuilder::additionalType);
+
         // Query
         GraphQLObjectType.Builder query = newObject().name(QUERY);
         this.queryFieldsMap.values().stream().forEach(query::field);
 
         // Mutation
-//        GraphQLObjectType.Builder mutation = newObject().name(MUTATION);
-//        this.mutationFieldsMap.values().stream().forEach(mutation::field);
+        GraphQLObjectType.Builder mutation = newObject().name(MUTATION);
+        this.mutationFieldsMap.values().stream().forEach(mutation::field);
 
         // Code registry
         GraphQLCodeRegistry.Builder codeRegistry = newCodeRegistry();
@@ -157,7 +180,7 @@ public class GraphQLSchemaBuilder {
 
         return schemaBuilder
                 .query(query.build())
-                //.mutation(mutation.build())
+                .mutation(mutation.build())
                 .build();
     }
 }
