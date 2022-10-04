@@ -62,7 +62,7 @@ public class GraphQLRegistryAutoConfiguration implements ApplicationListener<App
         final OkHttpClient client = new OkHttpClient();
         ServiceDto serviceDto = new ServiceDto();
         serviceDto.setName(appName);
-        serviceDto.setUrl("http://" + getServiceHost() + ":" + env.getProperty("local.server.port") + "/v2/api-docs");
+        serviceDto.setUrl("http://" + getServiceHost() + ":" + env.getProperty("local.server.port") + "/v3/api-docs");
         ObjectMapper objectMapper = new ObjectMapper();
         RequestBody body = RequestBody.create(JSON, objectMapper.writeValueAsString(serviceDto));
         Request request = new Request.Builder()
