@@ -99,6 +99,12 @@ public class OpenApiGraphQLSchemaBuilder {
                                  mutationFields.add(putMutationField);
                                  dataFetchers.put(FieldCoordinates.coordinates("Mutation", putMutationField.getName()), buildDataFetcher(host, key, value.getPut(), entry.getKey()));
                                  return entry.getValue();
+                            case DELETE:
+                                log.info("{}: {}", entry.getKey(), entry.getValue());
+                                final  GraphQLFieldDefinition deleteMutationField = pathToDeleteGraphQLField(entry.getValue().getOperationId(), value);
+                                mutationFields.add(deleteMutationField);
+                                dataFetchers.put(FieldCoordinates.coordinates("Mutation", deleteMutationField.getName()), buildDataFetcher(host, key, value.getDelete(), entry.getKey()));
+                                return entry.getValue();
                             default:
                                 return null;
                         }
@@ -191,6 +197,30 @@ public class OpenApiGraphQLSchemaBuilder {
 
         if (pathItem.getPut().getParameters() != null) {
             builder.arguments(pathItem.getPut().getParameters()
+                    .stream()
+                    .map(parameter -> parameterToGraphQLArgument(parameter))
+                    .collect(Collectors.toList())
+            );
+        }
+        return builder.build();
+    }
+
+    /**
+     * Maps Swagger path with GraphQLFieldDefinition
+     * Delete requests
+     * @param pathItem
+     * @return
+     */
+    private GraphQLFieldDefinition pathToDeleteGraphQLField(String name, PathItem pathItem) {
+        log.info("Path to GraphQLFieldDefinition: {} -- {}", name, pathItem.toString());
+        GraphQLFieldDefinition.Builder builder = newFieldDefinition()
+                .name(name)
+                .type(mapOutputType("",
+                        pathItem.getDelete().getResponses().get("200").getContent().get("application/json").getSchema())
+                        .orElse(null)); // GraphQLString
+
+        if (pathItem.getDelete().getParameters() != null) {
+            builder.arguments(pathItem.getDelete().getParameters()
                     .stream()
                     .map(parameter -> parameterToGraphQLArgument(parameter))
                     .collect(Collectors.toList())
