@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 public class GraphQLProvider {
@@ -33,7 +34,7 @@ public class GraphQLProvider {
      * @param location
      */
     public void register(String name, String location) {
-        switch (environment.getProperty("schema")) {
+        switch (Objects.requireNonNull(environment.getProperty("schema"))) {
             case "openapi":
                 openApiServices.put(name, new OpenAPIV3Parser().read(location));
                 break;
@@ -51,7 +52,7 @@ public class GraphQLProvider {
      * @param name
      */
     public void unregister(String name) {
-        switch (environment.getProperty("schema")) {
+        switch (Objects.requireNonNull(environment.getProperty("schema"))) {
             case "openapi":
                 openApiServices.remove(name);
                 break;
@@ -65,7 +66,7 @@ public class GraphQLProvider {
     }
 
     public Collection<String> services() {
-        switch (environment.getProperty("schema")) {
+        switch (Objects.requireNonNull(environment.getProperty("schema"))) {
             case "openapi":
                 return openApiServices.keySet();
             case "swagger":
@@ -79,7 +80,7 @@ public class GraphQLProvider {
      * Loads REST services in GraphQL schema
      */
     private void load() {
-        switch (environment.getProperty("schema")) {
+        switch (Objects.requireNonNull(environment.getProperty("schema"))) {
             case "openapi":
                 OpenApiGraphQLSchemaBuilder openapiGraphQLConverter = new OpenApiGraphQLSchemaBuilder();
                 openApiServices.values().stream().forEach(openapiGraphQLConverter::openapi);

@@ -16,18 +16,18 @@ public class RegistryController {
     }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity list() {
+    public ResponseEntity<?> list() {
         return ResponseEntity.ok(graphQLProvider.services());
     }
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity register(@RequestBody ServiceDto serviceDto) {
+    public ResponseEntity<?> register(@RequestBody ServiceDto serviceDto) {
         graphQLProvider.register(serviceDto.getName(), serviceDto.getUrl());
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity unregister(@RequestParam("service") String name) {
+    public ResponseEntity<?> unregister(@RequestParam("service") String name) {
         graphQLProvider.unregister(name);
         return ResponseEntity.noContent().build();
     }

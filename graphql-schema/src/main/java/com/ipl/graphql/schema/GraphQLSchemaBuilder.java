@@ -55,13 +55,13 @@ public class GraphQLSchemaBuilder {
     }
 
     public GraphQLSchemaBuilder objectTypes(@NonNull Collection<GraphQLObjectType> objectTypes) {
-        objectTypes.stream().forEach(this::objectType);
+        objectTypes.forEach(this::objectType);
 
         return this;
     }
 
     public GraphQLSchemaBuilder inputObjectTypes(@NonNull Collection<GraphQLInputObjectType> inputObjectTypes) {
-        inputObjectTypes.stream().forEach(this::inputObjectType);
+        inputObjectTypes.forEach(this::inputObjectType);
 
         return this;
     }
@@ -78,7 +78,7 @@ public class GraphQLSchemaBuilder {
     }
 
     public GraphQLSchemaBuilder interfaceTypes(@NonNull Collection<GraphQLInterfaceType> interfaceTypes) {
-        interfaceTypes.stream().forEach(this::interfaceType);
+        interfaceTypes.forEach(this::interfaceType);
 
         return this;
     }
@@ -94,7 +94,7 @@ public class GraphQLSchemaBuilder {
     }
 
     public GraphQLSchemaBuilder queryFields(@NonNull Collection<GraphQLFieldDefinition> fieldDefinitions) {
-        fieldDefinitions.stream().forEach(this::queryField);
+        fieldDefinitions.forEach(this::queryField);
 
         return this;
     }
@@ -110,7 +110,7 @@ public class GraphQLSchemaBuilder {
     }
 
     public GraphQLSchemaBuilder mutationFields(@NonNull Collection<GraphQLFieldDefinition> fieldDefinitions) {
-        fieldDefinitions.stream().forEach(this::mutationField);
+        fieldDefinitions.forEach(this::mutationField);
 
         return this;
     }
@@ -127,7 +127,7 @@ public class GraphQLSchemaBuilder {
 
     public GraphQLSchemaBuilder dataFetchers(Map<FieldCoordinates, DataFetcher<?>> dataFetchers) {
         if (dataFetchers!=null) {
-            dataFetchers.entrySet().stream().forEach(entry -> this.dataFetcher(entry.getKey(), entry.getValue()));
+            dataFetchers.forEach(this::dataFetcher);
         }
 
         return this;
@@ -156,26 +156,26 @@ public class GraphQLSchemaBuilder {
         GraphQLSchema.Builder schemaBuilder = newSchema();
 
         // Interface types
-        this.interfaceTypesMap.values().stream().forEach(schemaBuilder::additionalType);
+        this.interfaceTypesMap.values().forEach(schemaBuilder::additionalType);
 
         // Object types
-        this.objectTypesMap.values().stream().forEach(schemaBuilder::additionalType);
+        this.objectTypesMap.values().forEach(schemaBuilder::additionalType);
 
         // Input types
-        this.inputObjectTypeMap.values().stream().forEach(schemaBuilder::additionalType);
+        this.inputObjectTypeMap.values().forEach(schemaBuilder::additionalType);
 
         // Query
         GraphQLObjectType.Builder query = newObject().name(QUERY);
-        this.queryFieldsMap.values().stream().forEach(query::field);
+        this.queryFieldsMap.values().forEach(query::field);
 
         // Mutation
         GraphQLObjectType.Builder mutation = newObject().name(MUTATION);
-        this.mutationFieldsMap.values().stream().forEach(mutation::field);
+        this.mutationFieldsMap.values().forEach(mutation::field);
 
         // Code registry
         GraphQLCodeRegistry.Builder codeRegistry = newCodeRegistry();
-        this.dataFetchersMap.entrySet().stream().forEach(entry -> codeRegistry.dataFetcher(entry.getKey(), entry.getValue()));
-        this.typeResolversMap.entrySet().stream().forEach(entry -> codeRegistry.typeResolver(entry.getKey(), entry.getValue()));
+        this.dataFetchersMap.forEach(codeRegistry::dataFetcher);
+        this.typeResolversMap.forEach(codeRegistry::typeResolver);
         schemaBuilder.codeRegistry(codeRegistry.build());
 
         return schemaBuilder
