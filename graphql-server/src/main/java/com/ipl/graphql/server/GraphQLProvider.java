@@ -52,48 +52,38 @@ public class GraphQLProvider {
      * @param name
      */
     public void unregister(String name) {
-        switch (Objects.requireNonNull(environment.getProperty("schema"))) {
-            case "openapi":
-                openApiServices.remove(name);
-                break;
-            case "swagger":
-                swaggerServices.remove(name);
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown schema type: " + environment.getProperty("schema"));
-        }
+        String schema = Objects.requireNonNull(environment.getProperty("schema"));
+        if (schema.equals("openapi")) {
+            openApiServices.remove(name);
+        } else if (schema.equals("swagger")) {
+            swaggerServices.remove(name);
+        } else throw new IllegalArgumentException("Unknown schema type: " + environment.getProperty("schema"));
         load();
     }
 
     public Collection<String> services() {
-        switch (Objects.requireNonNull(environment.getProperty("schema"))) {
-            case "openapi":
-                return openApiServices.keySet();
-            case "swagger":
-                return swaggerServices.keySet();
-            default:
-                throw new IllegalArgumentException("Unknown schema type: " + environment.getProperty("schema"));
-        }
+        var schema = Objects.requireNonNull(environment.getProperty("schema"));
+        if (schema.equals("openapi")) {
+            return openApiServices.keySet();
+        } else if (schema.equals("swagger")) {
+            return swaggerServices.keySet();
+        } else throw new IllegalArgumentException("Unknown schema type: " + environment.getProperty("schema"));
     }
 
     /**
      * Loads REST services in GraphQL schema
      */
     private void load() {
-        switch (Objects.requireNonNull(environment.getProperty("schema"))) {
-            case "openapi":
-                OpenApiGraphQLSchemaBuilder openapiGraphQLConverter = new OpenApiGraphQLSchemaBuilder();
-                openApiServices.values().stream().forEach(openapiGraphQLConverter::openapi);
-                this.graphQL = GraphQL.newGraphQL(openapiGraphQLConverter.build()).build();
-                break;
-            case "swagger":
-                SwaggerGraphQLSchemaBuilder swaggerGraphQLConverter = new SwaggerGraphQLSchemaBuilder();
-                swaggerServices.values().stream().forEach(swaggerGraphQLConverter::swagger);
-                this.graphQL = GraphQL.newGraphQL(swaggerGraphQLConverter.build()).build();
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown schema type: " + environment.getProperty("schema"));
-        }
+        var schema = Objects.requireNonNull(environment.getProperty("schema"));
+        if (schema.equals("openapi")) {
+            OpenApiGraphQLSchemaBuilder openapiGraphQLConverter = new OpenApiGraphQLSchemaBuilder();
+            openApiServices.values().forEach(openapiGraphQLConverter::openapi);
+            this.graphQL = GraphQL.newGraphQL(openapiGraphQLConverter.build()).build();
+        } else if (schema.equals("swagger")) {
+            SwaggerGraphQLSchemaBuilder swaggerGraphQLConverter = new SwaggerGraphQLSchemaBuilder();
+            swaggerServices.values().forEach(swaggerGraphQLConverter::swagger);
+            this.graphQL = GraphQL.newGraphQL(swaggerGraphQLConverter.build()).build();
+        } else throw new IllegalArgumentException("Unknown schema type: " + environment.getProperty("schema"));
     }
 
     public GraphQL getGraphQL() {

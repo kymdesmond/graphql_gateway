@@ -1,0 +1,8 @@
+version: "3"
+services:
+  gateway: 
+    container_name: graphql_gateway
+    build: 
+      context: .
+      dockerfile: graphql-gateway-server/Dockerfile
+    image: graphql_gateway:latest
