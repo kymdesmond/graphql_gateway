@@ -144,7 +144,7 @@ public class OpenApiGraphQLSchemaBuilder {
         if (pathItem.getGet().getParameters() != null) {
             builder.arguments(pathItem.getGet().getParameters()
                     .stream()
-                    .map(parameter -> parameterToGraphQLArgument(parameter))
+                    .map(this::parameterToGraphQLArgument)
                     .collect(Collectors.toList())
             );
         }
