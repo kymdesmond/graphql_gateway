@@ -8,6 +8,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import graphql.ExecutionInput;
+import graphql.ExecutionResult;
+
 @RequestMapping("/graphql")
 @RestController
 @Slf4j
@@ -19,13 +22,17 @@ public class GraphQLController {
     }
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity graphql(@RequestBody GraphQLRequestBody request) {
+    public ResponseEntity<Object> graphql(@RequestBody GraphQLRequestBody request) {
         log.info("graphql request -- {}", request);
-        Object result = null;
-        if (request.getQuery() != null) {
-            result = graphQLProvider.getGraphQL().execute(request.getQuery());
+        ExecutionResult result = null;
+        if (request.getVariables() != null && request.getQuery() != null) {
+            ExecutionInput in = ExecutionInput.newExecutionInput().query(request.getQuery()).variables(request.getVariables()).build();
+            result = graphQLProvider.getGraphQL().execute(in);
         } else if (request.getMutation() != null) {
-            result = graphQLProvider.getGraphQL().execute(request.getMutation());
+            ExecutionInput in = ExecutionInput.newExecutionInput().query(request.getMutation()).variables(request.getVariables()).build();
+            result = graphQLProvider.getGraphQL().execute(in);
+        } else {
+            result = graphQLProvider.getGraphQL().execute(request.getQuery());
         }
         
         

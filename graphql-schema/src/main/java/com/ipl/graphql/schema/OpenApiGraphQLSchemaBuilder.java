@@ -13,10 +13,7 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.parameters.PathParameter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import okhttp3.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -294,28 +291,18 @@ public class OpenApiGraphQLSchemaBuilder {
 
     private Optional<GraphQLFieldDefinition> propertyToGraphQLField(Map.Entry<String, Schema> property) {
         Optional<GraphQLOutputType> type = mapOutputType(property.getKey(), property.getValue());
-        if (!type.isPresent()) {
-            return Optional.empty();
-        } else {
-            return Optional.of(newFieldDefinition()
-                    .name(property.getKey())
-                    .type(type.get())
-                    .build()
-            );
-        }
+        return type.map(graphQLOutputType -> newFieldDefinition()
+                .name(property.getKey())
+                .type(graphQLOutputType)
+                .build());
     }
 
     private Optional<GraphQLInputObjectField> propertyToGraphQLInputObjectField(Map.Entry<String, Schema> property) {
         Optional<GraphQLInputType> type = mapInputType(property.getKey(), property.getValue());
-        if (!type.isPresent()) {
-            return Optional.empty();
-        } else {
-            return Optional.of(newInputObjectField()
-                    .name(property.getKey())
-                    .type(type.get())
-                    .build()
-            );
-        }
+        return type.map(graphQLInputType -> newInputObjectField()
+                .name(property.getKey())
+                .type(graphQLInputType)
+                .build());
     }
 
     private Optional<GraphQLOutputType> mapOutputType(String name, Schema schema) {
@@ -378,32 +365,40 @@ public class OpenApiGraphQLSchemaBuilder {
             okhttp3.RequestBody requestBody = okhttp3.RequestBody
                     .create(MediaType.parse("application/json; charset=utf-8"), objectMapper.writeValueAsString(dataFetchingEnvironment.getArgument("input")));
             Request request;
+            Headers headers = new Headers.Builder()
+                    .add("TraceId", dataFetchingEnvironment.getExecutionId().toString())
+                    .build();
             switch (httpMethod) {
                 case POST:
                     request = new Request.Builder()
+                            .headers(headers)
                             .url(urlParams)
                             .post(requestBody)
                             .build();
                     break;
                 case PUT:
                     request = new Request.Builder()
+                            .headers(headers)
                             .url(urlParams)
                             .put(requestBody)
                             .build();
                     break;
                 case DELETE:
                     request = new Request.Builder()
+                            .headers(headers)
                             .url(urlParams)
                             .delete()
                             .build();
                     break;
                 default:
                     request = new Request.Builder()
+                            .headers(headers)
                             .url(urlParams)
                             .build();
                     break;
             }
             Response response = client.newCall(request).execute();
+            // TODO handle response properly here
             final String json = response.body().string();
             return objectMapper.readValue(json, new TypeReference<>(){});
         };

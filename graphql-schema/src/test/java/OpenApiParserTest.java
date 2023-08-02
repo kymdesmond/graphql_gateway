@@ -1,13 +1,15 @@
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.parser.OpenAPIV3Parser;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-class OpenApiParserTest {
+@SpringBootTest
+public class OpenApiParserTest {
 
     @Test
-    void shouldParseOpenApiFromJson() {
+    public void shouldParseOpenApiFromJson() {
         OpenAPI openAPI = new OpenAPIV3Parser().read("src/test/resources/listing-openapi.json");
 
         assertNotNull(openAPI);

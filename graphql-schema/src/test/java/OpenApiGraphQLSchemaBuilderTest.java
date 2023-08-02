@@ -2,18 +2,25 @@ import com.ipl.graphql.schema.OpenApiGraphQLSchemaBuilder;
 import graphql.schema.*;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.parser.OpenAPIV3Parser;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import static graphql.Scalars.GraphQLID;
 import static graphql.schema.FieldCoordinates.coordinates;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-class OpenApiGraphQLSchemaBuilderTest {
+@SpringBootTest(classes = {OpenApiGraphQLSchemaBuilderTest.class, OpenApiParserTest.class})
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
+@RunWith(SpringJUnit4ClassRunner.class)
+public class OpenApiGraphQLSchemaBuilderTest {
 
     private final static String OPENAPI_LOCATION = "src/test/resources/listing-openapi.json";
     @Test
-    void buildHasToDeclareQuery() {
+    public void buildHasToDeclareQuery() {
         //given
         final OpenApiGraphQLSchemaBuilder builder = new OpenApiGraphQLSchemaBuilder();
         final OpenAPI openAPI = new OpenAPIV3Parser().read(OPENAPI_LOCATION);
@@ -26,7 +33,7 @@ class OpenApiGraphQLSchemaBuilderTest {
     }
 
     @Test
-    void buildHasToDeclareMutation() {
+    public void buildHasToDeclareMutation() {
         //given
         final OpenApiGraphQLSchemaBuilder builder = new OpenApiGraphQLSchemaBuilder();
         final OpenAPI openAPI = new OpenAPIV3Parser().read(OPENAPI_LOCATION);
@@ -39,7 +46,7 @@ class OpenApiGraphQLSchemaBuilderTest {
     }
 
     @Test
-    void build_has_to_declare_Query_fields_by_Swagger_path() {
+    public void build_has_to_declare_Query_fields_by_OpenApi_path() {
         //given
         final OpenApiGraphQLSchemaBuilder builder = new OpenApiGraphQLSchemaBuilder();
         final OpenAPI openAPI = new OpenAPIV3Parser().read(OPENAPI_LOCATION);
@@ -66,7 +73,7 @@ class OpenApiGraphQLSchemaBuilderTest {
     }
 
     @Test
-    void build_has_to_declare_Mutation_InputObject() {
+    public void build_has_to_declare_Mutation_InputObject() {
         //given
         final OpenApiGraphQLSchemaBuilder builder = new OpenApiGraphQLSchemaBuilder();
         final OpenAPI openAPI = new OpenAPIV3Parser().read(OPENAPI_LOCATION);
@@ -83,7 +90,7 @@ class OpenApiGraphQLSchemaBuilderTest {
 
 
     @Test
-    void has_to_create_DataFetcher_By_Path() {
+    public void has_to_create_DataFetcher_By_Path() {
         //given
         final OpenApiGraphQLSchemaBuilder builder = new OpenApiGraphQLSchemaBuilder();
         final OpenAPI openAPI = new OpenAPIV3Parser().read(OPENAPI_LOCATION);
