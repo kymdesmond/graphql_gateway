@@ -3,17 +3,18 @@ package com.ipl.graphql.schema;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import graphql.schema.*;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
-import io.swagger.v3.oas.models.parameters.PathParameter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -44,20 +45,22 @@ public class OpenApiGraphQLSchemaBuilder {
     public OpenApiGraphQLSchemaBuilder openapi(OpenAPI openAPI) {
         log.info("--Building GraphQL schema from OpenAPI--");
         // type definitions
-        List<GraphQLObjectType> objectTypes = openAPI.getComponents().getSchemas()
+        List<GraphQLObjectType> objectTypes = null != openAPI.getComponents().getSchemas() ?
+                openAPI.getComponents().getSchemas()
                 .entrySet()
                 .stream()
                 .filter(entry -> entry.getKey().endsWith("Dto"))
                 .map(schemaEntry -> toGraphQLObjectType(schemaEntry.getKey(), schemaEntry.getValue()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()) : Collections.emptyList();
 
         // input type definitions
-        List<GraphQLInputObjectType> inputObjectTypes = openAPI.getComponents().getSchemas()
+        List<GraphQLInputObjectType> inputObjectTypes = null != openAPI.getComponents().getSchemas() ?
+                openAPI.getComponents().getSchemas()
                 .entrySet()
                 .stream()
                 .filter(entry -> entry.getKey().endsWith("Request"))
                 .map(schemaEntry -> toGraphQLInputObjectType(schemaEntry.getKey(), schemaEntry.getValue()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()) : Collections.emptyList();
 
         // query type
         List<GraphQLFieldDefinition> queryFields = new ArrayList<>();
@@ -246,12 +249,7 @@ public class OpenApiGraphQLSchemaBuilder {
      */
     private GraphQLInputType mapInputType(Parameter parameter) {
         final String fieldName = parameter.getName();
-        String swaggerType = null;
-        if (parameter instanceof PathParameter) {
-            swaggerType = parameter.getSchema().getType();
-        } else if (parameter instanceof RequestBody) {
-            swaggerType = parameter.getSchema().getType();
-        }
+        String swaggerType = parameter.getSchema().getType();
         if (isID(fieldName)) {
             return GraphQLID;
         } else {
@@ -355,6 +353,12 @@ public class OpenApiGraphQLSchemaBuilder {
         log.info("fetch data from url -- {}", url);
         List<String> pathParams = Optional.ofNullable(operation.getParameters()).orElse(Collections.emptyList())
                 .stream()
+                .filter(parameter -> parameter.getIn().equals("path"))
+                .map(Parameter::getName)
+                .collect(Collectors.toList());
+        List<String> queryParams = Optional.ofNullable(operation.getParameters()).orElse(Collections.emptyList())
+                .stream()
+                .filter(parameter -> parameter.getIn().equals("query"))
                 .map(Parameter::getName)
                 .collect(Collectors.toList());
 
@@ -364,6 +368,9 @@ public class OpenApiGraphQLSchemaBuilder {
                     .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
             okhttp3.RequestBody requestBody = okhttp3.RequestBody
                     .create(MediaType.parse("application/json; charset=utf-8"), objectMapper.writeValueAsString(dataFetchingEnvironment.getArgument("input")));
+            Map<String, String> queryParamMap = new HashMap<>();
+            queryParams.forEach(queryParam -> queryParamMap.put(queryParam, dataFetchingEnvironment.getArgument(queryParam).toString()));
+            String urlString = formatUrlWithQueryParameters(urlParams, queryParamMap);
             Request request;
             Headers headers = new Headers.Builder()
                     .add("TraceId", dataFetchingEnvironment.getExecutionId().toString())
@@ -372,28 +379,28 @@ public class OpenApiGraphQLSchemaBuilder {
                 case POST:
                     request = new Request.Builder()
                             .headers(headers)
-                            .url(urlParams)
+                            .url(urlString)
                             .post(requestBody)
                             .build();
                     break;
                 case PUT:
                     request = new Request.Builder()
                             .headers(headers)
-                            .url(urlParams)
+                            .url(urlString)
                             .put(requestBody)
                             .build();
                     break;
                 case DELETE:
                     request = new Request.Builder()
                             .headers(headers)
-                            .url(urlParams)
+                            .url(urlString)
                             .delete()
                             .build();
                     break;
                 default:
                     request = new Request.Builder()
                             .headers(headers)
-                            .url(urlParams)
+                            .url(urlString)
                             .build();
                     break;
             }
@@ -463,5 +470,28 @@ public class OpenApiGraphQLSchemaBuilder {
             return str;
         }
         return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
+    
+     private String formatUrlWithQueryParameters(String baseUrl, Map<String, String> queryParams) {
+        StringBuilder urlBuilder = new StringBuilder(baseUrl);
+
+        if (!queryParams.isEmpty()) {
+            urlBuilder.append('?');
+            
+            try {
+                for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+                    String key = URLEncoder.encode(entry.getKey(), "UTF-8");
+                    String value = URLEncoder.encode(entry.getValue(), "UTF-8");
+                    urlBuilder.append(key).append('=').append(value).append('&');
+                }
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+            
+            // Remove the last '&' character
+            urlBuilder.deleteCharAt(urlBuilder.length() - 1);
+        }
+
+        return urlBuilder.toString();
     }
 }

@@ -178,9 +178,14 @@ public class GraphQLSchemaBuilder {
         this.typeResolversMap.forEach(codeRegistry::typeResolver);
         schemaBuilder.codeRegistry(codeRegistry.build());
 
-        return schemaBuilder
-                .query(query.build())
-                .mutation(mutation.build())
-                .build();
+        // We expect that your Service should have at least one GET API
+        return this.mutationFieldsMap.entrySet().isEmpty() ?
+                schemaBuilder
+                        .query(query.build())
+                        .build() :
+                schemaBuilder
+                        .query(query.build())
+                        .mutation(mutation.build())
+                        .build();
     }
 }
