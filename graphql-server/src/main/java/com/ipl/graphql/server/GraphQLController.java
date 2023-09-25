@@ -24,7 +24,7 @@ public class GraphQLController {
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Object> graphql(@RequestBody GraphQLRequestBody request) {
         log.info("graphql request -- {}", request);
-        ExecutionResult result = null;
+        ExecutionResult result;
         if (request.getVariables() != null && request.getQuery() != null) {
             ExecutionInput in = ExecutionInput.newExecutionInput().query(request.getQuery()).variables(request.getVariables()).build();
             result = graphQLProvider.getGraphQL().execute(in);
@@ -36,8 +36,9 @@ public class GraphQLController {
         }
         
         
-        log.info("graphql response -- {}", result);
-        return (result != null)? ResponseEntity.ok(result): ResponseEntity.noContent().build();
+        log.info("graphql response -- {}", result.isDataPresent() ? "success" : result.getErrors());
+        log.debug("graphql full response -- {}", result);
+        return ResponseEntity.ok(result);
     }
 
 }

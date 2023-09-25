@@ -405,9 +405,11 @@ public class OpenApiGraphQLSchemaBuilder {
                     break;
             }
             Response response = client.newCall(request).execute();
-            // TODO handle response properly here
-            final String json = response.body().string();
-            return objectMapper.readValue(json, new TypeReference<>(){});
+            if (response.isSuccessful()) {
+                final String json = response.body().string();
+                return objectMapper.readValue(json, new TypeReference<>(){});
+            }
+            return null;
         };
 
     }
