@@ -13,9 +13,8 @@ import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,7 +27,7 @@ import static graphql.schema.GraphQLObjectType.newObject;
 
 @Slf4j
 public class OpenApiGraphQLSchemaBuilder {
-    
+
     private final GraphQLSchemaBuilder schemaBuilder;
 
     private final Map<String, GraphQLScalarType> scalarTypes = new HashMap<>() {
@@ -41,7 +40,7 @@ public class OpenApiGraphQLSchemaBuilder {
     public OpenApiGraphQLSchemaBuilder() {
         this.schemaBuilder = new GraphQLSchemaBuilder();
     }
- 
+
     public OpenApiGraphQLSchemaBuilder openapi(OpenAPI openAPI) {
         log.info("--Building GraphQL schema from OpenAPI--");
         // type definitions
@@ -198,7 +197,7 @@ public class OpenApiGraphQLSchemaBuilder {
         if (pathItem.getPut().getParameters() != null) {
             builder.arguments(pathItem.getPut().getParameters()
                     .stream()
-                    .map(parameter -> parameterToGraphQLArgument(parameter))
+                    .map(this::parameterToGraphQLArgument)
                     .collect(Collectors.toList())
             );
         }
@@ -222,7 +221,7 @@ public class OpenApiGraphQLSchemaBuilder {
         if (pathItem.getDelete().getParameters() != null) {
             builder.arguments(pathItem.getDelete().getParameters()
                     .stream()
-                    .map(parameter -> parameterToGraphQLArgument(parameter))
+                    .map(this::parameterToGraphQLArgument)
                     .collect(Collectors.toList())
             );
         }
@@ -250,8 +249,11 @@ public class OpenApiGraphQLSchemaBuilder {
     private GraphQLInputType mapInputType(Parameter parameter) {
         final String fieldName = parameter.getName();
         String swaggerType = parameter.getSchema().getType();
+        log.info("input schema type -- {}", swaggerType);
         if (isID(fieldName)) {
             return GraphQLID;
+        } else if (isReference(parameter.getSchema())) {
+            return mapInputType(fieldName, parameter.getSchema()).orElse(null);
         } else {
             return scalarTypes.get(swaggerType);
         }
@@ -261,7 +263,7 @@ public class OpenApiGraphQLSchemaBuilder {
         Map<String, Schema> properties = schemaModel.getProperties();
         List<GraphQLFieldDefinition> fields = properties.entrySet()
                 .stream()
-                .map(property -> propertyToGraphQLField(property))
+                .map(this::propertyToGraphQLField)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .collect(Collectors.toList());
@@ -276,7 +278,7 @@ public class OpenApiGraphQLSchemaBuilder {
         Map<String, Schema> properties = schemaModel.getProperties();
         List<GraphQLInputObjectField> fields = properties.entrySet()
                 .stream()
-                .map(property -> propertyToGraphQLInputObjectField(property))
+                .map(this::propertyToGraphQLInputObjectField)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .collect(Collectors.toList());
@@ -316,7 +318,7 @@ public class OpenApiGraphQLSchemaBuilder {
             outputType = GraphQLTypeReference.typeRef(schema.get$ref().replace("#/components/schemas/", ""));
             log.info("{} is reference type: {}", name, outputType);
         } else if (isArray(schema)) {
-            outputType = GraphQLList.list(mapOutputType(name, ((ArraySchema)schema).getItems()).orElse(null));
+            outputType = GraphQLList.list(Objects.requireNonNull(mapOutputType(name, ((ArraySchema) schema).getItems()).orElse(null)));
             log.info("{} is array type {}", name, outputType);
         }
         return Optional.ofNullable(outputType);
@@ -335,7 +337,7 @@ public class OpenApiGraphQLSchemaBuilder {
             inputType = GraphQLTypeReference.typeRef(schema.get$ref().replace("#/components/schemas/", ""));
             log.info("{} is reference type: {}", name, inputType);
         } else if (isArray(schema)) {
-            inputType = GraphQLList.list(mapInputType(name, ((ArraySchema)schema).getItems()).orElse(null));
+            inputType = GraphQLList.list(Objects.requireNonNull(mapInputType(name, ((ArraySchema) schema).getItems()).orElse(null)));
             log.info("{} is array type {}", name, inputType);
         }
         return Optional.ofNullable(inputType);
@@ -356,16 +358,25 @@ public class OpenApiGraphQLSchemaBuilder {
                 .filter(parameter -> parameter.getIn().equals("path"))
                 .map(Parameter::getName)
                 .collect(Collectors.toList());
+        log.info(pathParams.toString());
         List<String> queryParams = Optional.ofNullable(operation.getParameters()).orElse(Collections.emptyList())
                 .stream()
                 .filter(parameter -> parameter.getIn().equals("query"))
                 .map(Parameter::getName)
                 .collect(Collectors.toList());
-
+        log.info(queryParams.toString());
         return dataFetchingEnvironment -> {
             String urlParams = pathParams
                     .stream()
-                    .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr), dataFetchingEnvironment.getArgument(curr).toString()));
+                    .reduce(url, (acc, curr) -> url.replaceAll(String.format("\\{%s}", curr),
+                            null != dataFetchingEnvironment.getArgument(curr)
+                                    ? dataFetchingEnvironment.getArgument(curr).toString()
+                                    : Objects.requireNonNull(operation.getParameters()
+                                    .stream()
+                                    .filter(parameter -> parameter.getName().equals(curr))
+                                    .findFirst().orElse(null))
+                                    .getSchema()
+                                    .getDefault().toString()));
             okhttp3.RequestBody requestBody = okhttp3.RequestBody
                     .create(MediaType.parse("application/json; charset=utf-8"), objectMapper.writeValueAsString(dataFetchingEnvironment.getArgument("input")));
             Map<String, String> queryParamMap = new HashMap<>();
@@ -404,6 +415,7 @@ public class OpenApiGraphQLSchemaBuilder {
                             .build();
                     break;
             }
+            log.info("request -- {}", request);
             Response response = client.newCall(request).execute();
             if (response.isSuccessful()) {
                 final String json = response.body().string();
@@ -473,23 +485,19 @@ public class OpenApiGraphQLSchemaBuilder {
         }
         return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
-    
+
      private String formatUrlWithQueryParameters(String baseUrl, Map<String, String> queryParams) {
         StringBuilder urlBuilder = new StringBuilder(baseUrl);
 
         if (!queryParams.isEmpty()) {
             urlBuilder.append('?');
-            
-            try {
-                for (Map.Entry<String, String> entry : queryParams.entrySet()) {
-                    String key = URLEncoder.encode(entry.getKey(), "UTF-8");
-                    String value = URLEncoder.encode(entry.getValue(), "UTF-8");
-                    urlBuilder.append(key).append('=').append(value).append('&');
-                }
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+
+            for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+                String key = URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8);
+                String value = URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8);
+                urlBuilder.append(key).append('=').append(value).append('&');
             }
-            
+
             // Remove the last '&' character
             urlBuilder.deleteCharAt(urlBuilder.length() - 1);
         }

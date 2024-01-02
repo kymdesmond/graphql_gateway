@@ -38,7 +38,11 @@
 			<groupId>com.ipl</groupId>
 			<artifactId>graphql-server</artifactId>
 		</dependency>
-
+		<!-- graphql-java -->
+		<dependency>
+			<groupId>com.graphql-java</groupId>
+			<artifactId>graphql-java</artifactId>
+		</dependency>
 		<!-- Tests -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
